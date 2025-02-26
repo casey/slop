@@ -1,6 +1,6 @@
 use {
   clap::Parser,
-  comrak::{nodes::NodeValue, parse_document, Arena, ComrakOptions},
+  comrak::{Arena, ComrakOptions, nodes::NodeValue, parse_document},
   llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
@@ -8,7 +8,7 @@ use {
   },
   regex::Regex,
   serde::Deserialize,
-  serde_with::{serde_as, DisplayFromStr},
+  serde_with::{DisplayFromStr, serde_as},
   std::{
     collections::VecDeque,
     error::Error,
