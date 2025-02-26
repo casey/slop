@@ -1,0 +1,6 @@
+[package]
+name = "slop"
+version = "0.0.0"
+edition = "2024"
+license = "CC0-1.0"
+description = "An AI Slopprentice"
