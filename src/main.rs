@@ -4,6 +4,7 @@ use {
   llm::{
     builder::{LLMBackend, LLMBuilder},
     chat::ChatMessage,
+    error::LLMError,
   },
   regex::Regex,
   serde::Deserialize,
@@ -29,7 +30,6 @@ mod highlighter;
 
 type Result<T = (), E = Box<dyn Error>> = std::result::Result<T, E>;
 
-#[allow(unused)]
 struct Match {
   end: usize,
   path: PathBuf,
@@ -104,6 +104,7 @@ impl Job {
   }
 }
 
+#[allow(unused)]
 fn extract_replacement(markdown: &str) -> Result<String> {
   let arena = Arena::new();
 
@@ -132,6 +133,7 @@ fn extract_replacement(markdown: &str) -> Result<String> {
   } else if code_blocks.len() == 1 {
     Ok(code_blocks.pop().unwrap())
   } else {
+    eprintln!("{markdown}");
     Err(format!("{} code blocks found", code_blocks.len()).into())
   }
 }
@@ -159,9 +161,13 @@ async fn main() -> Result {
 
     let messages = vec![ChatMessage::user().content(prompt).build()];
 
-    let response = llm.chat(&messages).await?;
+    let response = match llm.chat(&messages).await {
+      Ok(response) => response,
+      Err(LLMError::HttpError(err)) if err.contains("529") => continue,
+      Err(err) => return Err(err.into()),
+    };
 
-    let replacement = extract_replacement(&response.to_string())?;
+    let replacement = response.to_string();
 
     eprintln!("Replacement:\n\n{replacement}\n");
 
