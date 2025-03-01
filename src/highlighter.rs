@@ -21,7 +21,6 @@ impl Highlighter {
 
     while let Some(node) = queue.pop_front() {
       if let NodeValue::CodeBlock(ref mut block) = node.data.borrow_mut().value {
-        dbg!(&block.info);
         if let Some(syntax) = self.syntax_set.find_syntax_by_token(&block.info) {
           let mut highlight_lines =
             HighlightLines::new(syntax, &self.theme_set.themes["Solarized (dark)"]);
