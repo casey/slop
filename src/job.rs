@@ -13,7 +13,6 @@ impl Job {
     match self {
       Self::Replace(replace) => replace.run().await?,
     }
-
     Ok(())
   }
 }
