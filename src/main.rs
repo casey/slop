@@ -1,4 +1,5 @@
 use {
+  crate::{arguments::Arguments, job::Job, passage::Passage},
   clap::Parser,
   comrak::{Arena, ComrakOptions, nodes::NodeValue, parse_document},
   llm::{
@@ -14,7 +15,7 @@ use {
     error::Error,
     fs::{self, File},
     io::Cursor,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
   },
   syntect::{
@@ -26,83 +27,12 @@ use {
   walkdir::WalkDir,
 };
 
+mod arguments;
 mod highlighter;
+mod job;
+mod passage;
 
 type Result<T = (), E = Box<dyn Error>> = std::result::Result<T, E>;
-
-struct Match {
-  end: usize,
-  path: PathBuf,
-  start: usize,
-  text: String,
-}
-
-impl Match {
-  fn as_str(&self) -> &str {
-    &self.text[self.start..self.end]
-  }
-
-  fn replace(&self, replacement: &str) -> String {
-    format!(
-      "{}{replacement}{}",
-      &self.text[..self.start],
-      &self.text[self.end..],
-    )
-  }
-}
-
-#[derive(Parser)]
-struct Arguments {
-  #[clap(long)]
-  job: PathBuf,
-}
-
-#[serde_as]
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Job {
-  path: PathBuf,
-  #[serde_as(as = "DisplayFromStr")]
-  regex: Regex,
-  prompt: String,
-  check: Vec<String>,
-  commit: String,
-}
-
-impl Job {
-  fn find(&self) -> Result<Option<Match>> {
-    for entry in WalkDir::new(&self.path) {
-      let entry = entry?;
-      let path = entry.path();
-
-      if entry.file_type().is_dir()
-        || !path
-          .extension()
-          .map(|extension| extension == "rs")
-          .unwrap_or_default()
-      {
-        continue;
-      }
-
-      let text = fs::read_to_string(path)?;
-
-      if let Some(capture) = self.regex.find(&text) {
-        return Ok(Some(Match {
-          path: path.into(),
-          start: capture.start(),
-          end: capture.end(),
-          text,
-        }));
-      }
-    }
-
-    Ok(None)
-  }
-
-  fn prompt(&self, m: &Match) -> String {
-    self.prompt.replace("%%", &m.text[m.start..m.end])
-  }
-}
 
 #[allow(unused)]
 fn extract_replacement(markdown: &str) -> Result<String> {
@@ -140,65 +70,5 @@ fn extract_replacement(markdown: &str) -> Result<String> {
 
 #[tokio::main]
 async fn main() -> Result {
-  let arguments = Arguments::parse();
-
-  let job: Job = serde_yaml::from_reader(File::open(arguments.job)?)?;
-
-  let api_key = fs::read_to_string(dirs::home_dir().unwrap().join(".slop"))?
-    .trim()
-    .to_owned();
-
-  let llm = LLMBuilder::new()
-    .backend(LLMBackend::Anthropic)
-    .model("claude-3-7-sonnet-20250219")
-    .api_key(api_key)
-    .build()?;
-
-  while let Some(m) = job.find()? {
-    eprintln!("Found match:\n\n{}\n", m.as_str());
-
-    let prompt = job.prompt(&m);
-
-    let messages = vec![ChatMessage::user().content(prompt).build()];
-
-    let response = match llm.chat(&messages).await {
-      Ok(response) => response,
-      Err(LLMError::HttpError(err)) if err.contains("529") => continue,
-      Err(err) => return Err(err.into()),
-    };
-
-    let replacement = response.to_string();
-
-    eprintln!("Replacement:\n\n{replacement}\n");
-
-    fs::write(&m.path, m.replace(&replacement))?;
-
-    eprintln!("Running check…");
-
-    let status = Command::new(&job.check[0])
-      .args(&job.check[1..])
-      .current_dir(&job.path)
-      .status()?;
-
-    if !status.success() {
-      return Err("Check failed:".into());
-    }
-
-    eprintln!("Comitting…");
-
-    let status = Command::new("git")
-      .arg("commit")
-      .arg("--message")
-      .arg(&job.commit)
-      .arg("--")
-      .arg(m.path.strip_prefix(&job.path).unwrap())
-      .current_dir(&job.path)
-      .status()?;
-
-    if !status.success() {
-      return Err("Commit failed:".into());
-    }
-  }
-
-  Ok(())
+  Arguments::parse().run().await
 }

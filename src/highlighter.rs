@@ -1,22 +1,14 @@
-use super::*;
+use {super::*, comrak::Options};
 
 #[allow(unused)]
-pub(crate) struct Highlighter {
+struct Highlighter {
   syntax_set: SyntaxSet,
   theme_set: ThemeSet,
 }
 
 impl Highlighter {
   #[allow(unused)]
-  pub(crate) fn new() -> Self {
-    Self {
-      syntax_set: SyntaxSet::load_defaults_newlines(),
-      theme_set: ThemeSet::load_defaults(),
-    }
-  }
-
-  #[allow(unused)]
-  pub(crate) fn highlight(&self, markdown: &str) -> Result<String> {
+  fn highlight(&self, markdown: &str) -> Result<String> {
     let arena = Arena::new();
 
     let options = ComrakOptions::default();
@@ -29,7 +21,6 @@ impl Highlighter {
 
     while let Some(node) = queue.pop_front() {
       if let NodeValue::CodeBlock(ref mut block) = node.data.borrow_mut().value {
-        dbg!(&block.info);
         if let Some(syntax) = self.syntax_set.find_syntax_by_token(&block.info) {
           let mut highlight_lines =
             HighlightLines::new(syntax, &self.theme_set.themes["Solarized (dark)"]);
@@ -53,8 +44,16 @@ impl Highlighter {
 
     let mut output = Cursor::new(Vec::new());
 
-    comrak::format_commonmark(root, &Default::default(), &mut output)?;
+    comrak::format_commonmark(root, &Options::default(), &mut output)?;
 
     Ok(String::from_utf8(output.into_inner()).unwrap())
+  }
+
+  #[allow(unused)]
+  fn new() -> Self {
+    Self {
+      syntax_set: SyntaxSet::load_defaults_newlines(),
+      theme_set: ThemeSet::load_defaults(),
+    }
   }
 }
