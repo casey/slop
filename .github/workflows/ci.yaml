@@ -22,6 +22,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install ripgrep
+
     - name: Install Rust Toolchain
       run: rustup toolchain install stable --profile minimal --component rustfmt clippy
 
