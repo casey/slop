@@ -1612,6 +1612,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "syntect",
+ "tempfile",
  "tokio",
  "walkdir",
 ]
