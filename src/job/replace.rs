@@ -94,3 +94,45 @@ impl Replace {
     Ok(())
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn load() {
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().unwrap();
+
+    let path = tmp.path().join("job.yaml");
+
+    fs::write(
+      &path,
+      r"type: replace
+commit: rewrite function
+path: foo/bar
+regex: '(?ms)^fn hello\(\) \{.*?^\}$'
+check: ['cargo', 'test']
+prompt: hello %% goodbye
+",
+    )
+    .unwrap();
+
+    match Job::load(&path).unwrap() {
+      Job::Replace(Replace {
+        check,
+        commit,
+        path,
+        prompt,
+        regex,
+      }) => {
+        assert_eq!(check, ["cargo", "test"]);
+        assert_eq!(commit, "rewrite function");
+        assert_eq!(path, Path::new("foo/bar"));
+        assert_eq!(prompt, "hello %% goodbye");
+        assert_eq!(regex.as_str(), r"(?ms)^fn hello\(\) \{.*?^\}$");
+      }
+    }
+  }
+}
