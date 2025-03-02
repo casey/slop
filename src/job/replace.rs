@@ -133,6 +133,7 @@ prompt: hello %% goodbye
         assert_eq!(prompt, "hello %% goodbye");
         assert_eq!(regex.as_str(), r"(?ms)^fn hello\(\) \{.*?^\}$");
       }
+      _ => panic!("Expected Job::Replace"),
     }
   }
 }
